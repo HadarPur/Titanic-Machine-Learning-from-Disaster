@@ -1,0 +1,10 @@
+from pathlib import Path
+
+SEED = 42
+VAL_FRACTION = 0.2
+BATCH_SIZE = 64
+LEARNING_RATE = 1e-3
+WEIGHT_DECAY = 1e-4
+MAX_EPOCHS = 200
+EARLY_STOP_PATIENCE = 20
+ARTIFACTS_DIR = Path("artifacts")
