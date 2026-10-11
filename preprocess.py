@@ -3,7 +3,7 @@
 The pipeline exposes a single `preprocess(train_df, test_df)` entry point
 that returns model-ready NumPy-friendly DataFrames. Design choices:
 
-* **No leakage.** All imputation statistics (median Age by Pclass+Sex,
+* **No leakage.** All imputation statistics (median Age by Pclass+Title,
   median Fare by Pclass, modal Embarked) are learned from the training
   set only, then applied to both splits. If we fit on the full dataset
   we would smuggle information about the test rows back into training.
@@ -76,10 +76,12 @@ def _fit_imputers(train: pd.DataFrame) -> dict:
     docstring on leakage.
     """
     return {
-        # Age varies strongly with class and sex (1st-class women are
-        # older on average than 3rd-class men), so a group-wise median
-        # is more accurate than a global median.
-        "age_by_class_sex": train.groupby(["Pclass", "Sex"])["Age"].median(),
+        # Age is best predicted by Title (Master => boy, Miss => young
+        # woman, Mr/Mrs => adult, Rare => older) combined with Pclass.
+        # Grouping by Title instead of Sex correctly handles boys with
+        # the "Master" title — they'd otherwise be filled with the adult
+        # male median.
+        "age_by_class_title": train.groupby(["Pclass", "Title"])["Age"].median(),
         # Fare depends almost entirely on Pclass.
         "fare_by_class": train.groupby("Pclass")["Fare"].median(),
         # Embarked has just two missing values; filling with the mode
@@ -92,12 +94,12 @@ def _impute(df: pd.DataFrame, imputers: dict) -> pd.DataFrame:
     """Fill missing Age / Fare / Embarked using the pre-computed stats."""
     df = df.copy()
 
-    # Look up the right median for each row's (Pclass, Sex) combo. We
-    # build a Series aligned to df.index because `MultiIndex.map` would
-    # return an Index, which `fillna` won't accept.
-    age_lookup = imputers["age_by_class_sex"]
+    # Look up the right median for each row's (Pclass, Title) combo.
+    # We build a Series aligned to df.index because `MultiIndex.map`
+    # would return an Index, which `fillna` won't accept.
+    age_lookup = imputers["age_by_class_title"]
     age_fill = pd.Series(
-        [age_lookup.get((p, s)) for p, s in zip(df["Pclass"], df["Sex"])],
+        [age_lookup.get((p, t)) for p, t in zip(df["Pclass"], df["Title"])],
         index=df.index,
     )
     df["Age"] = df["Age"].fillna(age_fill)
@@ -169,6 +171,11 @@ def summarize(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame) -
     previews the first few rows — enough to spot-check that the
     pipeline did what we expected.
     """
+    imputed_and_kept = {
+        "Age":      "median by (Pclass, Title)",
+        "Fare":     "median by Pclass",
+        "Embarked": "mode ('S')",
+    }
     engineered = ["Title", "FamilySize", "IsAlone", "Deck", "TicketGroup"]
     one_hot_groups = {
         "Embarked": [c for c in X_train.columns if c.startswith("Embarked_")],
@@ -183,6 +190,9 @@ def summarize(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame) -
     print(f"Missing left : X_train={X_train.isna().sum().sum()}, X_test={X_test.isna().sum().sum()}")
     print(f"Class balance: {survived}/{total} survived ({survived / total:.1%})")
     print(f"Dropped raw  : {DROP_COLS}")
+    print("Imputed+kept :")
+    for col, strategy in imputed_and_kept.items():
+        print(f"  - {col:<9} <- {strategy}")
     print(f"Engineered   : {engineered}")
     for base, cols in one_hot_groups.items():
         print(f"One-hot {base:<8}: {cols}")
