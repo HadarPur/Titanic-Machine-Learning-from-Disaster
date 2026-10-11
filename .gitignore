@@ -1,2 +1,4 @@
 .idea/*
 .venv/*
+.ipynb_checkpoints/titanic_eda-checkpoint.ipynb
+__pycache__/*
