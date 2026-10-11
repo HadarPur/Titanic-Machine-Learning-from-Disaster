@@ -4,7 +4,7 @@ Pipeline:
 
     1. Load raw CSV and run it through `preprocess` (feature
        engineering + imputation + encoding — see preprocess.py).
-    2. Stratified 80/20 split on the survival label so the validation
+    2. Stratified 70/30 split on the survival label so the validation
        set keeps the same class balance as the training set.
     3. Standardize features using statistics fit on the TRAIN split
        only (same mean/std are later applied to val and to inference

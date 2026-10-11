@@ -12,13 +12,15 @@ from pathlib import Path
 SEED = 42
 
 # Fraction of the training set held out for validation (early stopping,
-# checkpoint selection). 0.2 keeps ~178 passengers for validation — enough
-# to be a useful signal without starving the training set.
-VAL_FRACTION = 0.2
+# checkpoint selection). 0.3 keeps ~267 passengers for validation — a
+# larger holdout reduces the noise in the val-accuracy signal (one
+# correct/wrong flip is ~0.4pp instead of ~0.6pp at 0.2) at the cost
+# of ~90 fewer training rows.
+VAL_FRACTION = 0.3
 
-# Mini-batch size for SGD updates. 64 is a good default on CPU for ~700
+# Mini-batch size for SGD updates. 64 is a good default on CPU for ~600
 # training rows: large enough for stable gradients, small enough that we
-# still get ~11 updates per epoch.
+# still get ~10 updates per epoch.
 BATCH_SIZE = 64
 
 # Adam learning rate. 1e-3 is the canonical starting point for MLPs on

@@ -186,7 +186,7 @@ Linear(16    → 1)                              # raw logit
 
 ### Training (`train.py`)
 
-* **Stratified 80/20 split** on `Survived` so the ~38% positive rate is preserved in both train and validation.
+* **Stratified 70/30 split** on `Survived` so the ~38% positive rate is preserved in both train and validation. A larger (30%) holdout trades ~90 training rows for a less noisy val-accuracy signal.
 * **Train-only normalization.** Mean/std are computed on the training split and then applied to val and inference. This is what keeps the pipeline leak-free.
 * **Zero-std guard.** Constant columns (a one-hot category that happens to be single-valued in the training split) are divided by 1 instead of 0.
 * **Early stopping on best val accuracy.** We snapshot the best weights (not the final epoch's) and ship those — late-training overfit doesn't degrade what gets saved.
