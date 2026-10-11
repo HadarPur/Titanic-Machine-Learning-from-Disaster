@@ -22,10 +22,9 @@ from preprocess import preprocess
 
 # Load the data
 train_df = pd.read_csv('./data/train.csv')
-test_df = pd.read_csv("./data/test.csv")
 
 # preprocess
-X_train, y_train, X_test = preprocess(train_df, test_df)
+X_train, y_train, imputers = preprocess(train_df)
 
 # start training
 torch.manual_seed(SEED)
@@ -103,5 +102,5 @@ for epoch in range(1, MAX_EPOCHS + 1):
         print(f"early stop at epoch {epoch} (best val accuracy {best_val_accuracy:.4f})")
         break
 
-save_artifacts(best_model_state, feature_mean, feature_std, X_train.columns)
+save_artifacts(best_model_state, feature_mean, feature_std, X_train.columns, imputers)
 print(f"\nsaved to {ARTIFACTS_DIR}/ — best val accuracy {best_val_accuracy:.4f}")

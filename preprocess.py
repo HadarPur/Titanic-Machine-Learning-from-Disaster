@@ -1,20 +1,29 @@
 """Feature engineering and cleaning for the Titanic dataset.
 
-The pipeline exposes a single `preprocess(train_df, test_df)` entry point
-that returns model-ready NumPy-friendly DataFrames. Design choices:
+Two entry points:
 
-* **No leakage.** All imputation statistics (median Age by Pclass+Title,
+    preprocess(train_df)
+        Fits imputation stats and returns `(X_train, y_train, imputers)`.
+        Used at training time.
+
+    preprocess_inference(df, imputers, columns)
+        Applies the same transformations to new rows using previously
+        fitted imputers, and reindexes the result to match the training
+        feature schema. Used at inference time (e.g. the Streamlit app).
+
+Design choices:
+
+* **No leakage.** Imputation statistics (median Age by Pclass+Title,
   median Fare by Pclass, modal Embarked) are learned from the training
-  set only, then applied to both splits. If we fit on the full dataset
-  we would smuggle information about the test rows back into training.
+  set only. Inference reuses the saved stats — it never re-fits.
 
 * **Feature engineering over raw columns.** `Name`, `Ticket`, and `Cabin`
   carry strong signal but need extraction (`Title`, `TicketGroup`,
   `Deck`) before a model can use them. The raw columns are dropped afterward.
 
-* **Column alignment.** Test data is reindexed to match the training
-  feature matrix so that one-hot encoding never produces mismatched
-  columns across splits (e.g. a Deck letter that only appears in test).
+* **Column alignment.** Inference data is reindexed to the training
+  column schema so one-hot encoding never produces mismatched columns
+  (e.g. a Deck letter that only appears in inference).
 """
 
 import numpy as np
@@ -123,50 +132,54 @@ def _encode(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def preprocess(train_df: pd.DataFrame, test_df: pd.DataFrame):
-    """Transform raw Kaggle CSVs into model-ready feature matrices.
+def preprocess(train_df: pd.DataFrame):
+    """Fit the training-time pipeline on `train_df`.
 
     Args:
         train_df: The raw `train.csv` DataFrame (must contain `Survived`).
-        test_df:  The raw `test.csv` DataFrame (no `Survived` column).
 
     Returns:
-        A tuple `(X_train, y_train, X_test)` where:
-            X_train — DataFrame of engineered/encoded features, no NaNs.
-            y_train — Series of binary survival labels (0 or 1).
-            X_test  — DataFrame with the exact same columns as X_train,
-                      in the same order; new/missing one-hot columns are
-                      filled with 0.
-
-    Imputation statistics are learned from `train_df` only to prevent
-    leakage from the test set into training.
+        A tuple `(X_train, y_train, imputers)` where:
+            X_train  — DataFrame of engineered/encoded features, no NaNs.
+            y_train  — Series of binary survival labels (0 or 1).
+            imputers — Fitted imputation stats; persist these alongside
+                       the model so `preprocess_inference` can reuse them.
     """
     y_train = train_df["Survived"].copy()
     train = train_df.drop(columns=["Survived"])
 
     train = _add_features(train)
-    test = _add_features(test_df)
-
     imputers = _fit_imputers(train)
     train = _impute(train, imputers)
-    test = _impute(test, imputers)
-
     train = _encode(train).drop(columns=DROP_COLS)
-    test = _encode(test).drop(columns=DROP_COLS)
 
-    # Guarantee identical column schemas across splits. A Deck letter
-    # (or any rare category) present in only one split would otherwise
-    # produce mismatched one-hot columns.
-    test = test.reindex(columns=train.columns, fill_value=0)
-
-    summarize(train, y_train, test)
-    return train, y_train, test
+    summarize(train, y_train)
+    return train, y_train, imputers
 
 
-def summarize(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame) -> None:
+def preprocess_inference(df: pd.DataFrame, imputers: dict, columns) -> pd.DataFrame:
+    """Apply the training-time pipeline to new rows using saved imputers.
+
+    Args:
+        df:       Raw inference DataFrame (no `Survived` column needed).
+        imputers: Imputation stats returned by `preprocess`.
+        columns:  The training feature schema (X_train.columns) — the
+                  output is reindexed to this exact column list so new
+                  or missing one-hot categories are handled consistently.
+
+    Returns:
+        DataFrame with the same columns (and order) as the training set.
+    """
+    df = _add_features(df)
+    df = _impute(df, imputers)
+    df = _encode(df).drop(columns=DROP_COLS, errors="ignore")
+    return df.reindex(columns=columns, fill_value=0)
+
+
+def summarize(X_train: pd.DataFrame, y_train: pd.Series) -> None:
     """Print a human-readable summary of what preprocessing produced.
 
-    Highlights the shapes, confirms there are no missing values left,
+    Highlights the shape, confirms there are no missing values left,
     shows the class balance, lists the engineered feature groups, and
     previews the first few rows — enough to spot-check that the
     pipeline did what we expected.
@@ -186,8 +199,8 @@ def summarize(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame) -
     total = len(y_train)
 
     print("============ Preprocessing summary ============")
-    print(f"Shapes       : X_train {X_train.shape}, y_train {y_train.shape}, X_test {X_test.shape}")
-    print(f"Missing left : X_train={X_train.isna().sum().sum()}, X_test={X_test.isna().sum().sum()}")
+    print(f"Shapes       : X_train {X_train.shape}, y_train {y_train.shape}")
+    print(f"Missing left : X_train={X_train.isna().sum().sum()}")
     print(f"Class balance: {survived}/{total} survived ({survived / total:.1%})")
     print(f"Dropped raw  : {DROP_COLS}")
     print("Imputed+kept :")
