@@ -156,4 +156,37 @@ def preprocess(train_df: pd.DataFrame, test_df: pd.DataFrame):
     # (or any rare category) present in only one split would otherwise
     # produce mismatched one-hot columns.
     test = test.reindex(columns=train.columns, fill_value=0)
+
+    summarize(train, y_train, test)
     return train, y_train, test
+
+
+def summarize(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame) -> None:
+    """Print a human-readable summary of what preprocessing produced.
+
+    Highlights the shapes, confirms there are no missing values left,
+    shows the class balance, lists the engineered feature groups, and
+    previews the first few rows — enough to spot-check that the
+    pipeline did what we expected.
+    """
+    engineered = ["Title", "FamilySize", "IsAlone", "Deck", "TicketGroup"]
+    one_hot_groups = {
+        "Embarked": [c for c in X_train.columns if c.startswith("Embarked_")],
+        "Title":    [c for c in X_train.columns if c.startswith("Title_")],
+        "Deck":     [c for c in X_train.columns if c.startswith("Deck_")],
+    }
+    survived = int(y_train.sum())
+    total = len(y_train)
+
+    print("============ Preprocessing summary ============")
+    print(f"Shapes       : X_train {X_train.shape}, y_train {y_train.shape}, X_test {X_test.shape}")
+    print(f"Missing left : X_train={X_train.isna().sum().sum()}, X_test={X_test.isna().sum().sum()}")
+    print(f"Class balance: {survived}/{total} survived ({survived / total:.1%})")
+    print(f"Dropped raw  : {DROP_COLS}")
+    print(f"Engineered   : {engineered}")
+    for base, cols in one_hot_groups.items():
+        print(f"One-hot {base:<8}: {cols}")
+
+    print("\n------------ X_train.head() ------------")
+    print(X_train.head())
+    print("================================================\n")
