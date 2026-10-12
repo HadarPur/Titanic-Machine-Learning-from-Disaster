@@ -121,8 +121,6 @@ A **Shutdown server** button in the sidebar stops the Streamlit process cleanly.
 
 ## Example usage
 
-Screenshots live in `docs/screenshots/` (create the folder and drop PNGs in with the names below).
-
 **Training pipeline** — console output from `python train.py`:
 
 ![Training run](docs/screenshots/train_run.png)
@@ -189,7 +187,7 @@ Linear(16    → 1)                              # raw logit
 * **Stratified 70/30 split** on `Survived` so the ~38% positive rate is preserved in both train and validation. A larger (30%) holdout trades ~90 training rows for a less noisy val-accuracy signal.
 * **Train-only normalization.** Mean/std are computed on the training split and then applied to val and inference. This is what keeps the pipeline leak-free.
 * **Zero-std guard.** Constant columns (a one-hot category that happens to be single-valued in the training split) are divided by 1 instead of 0.
-* **Early stopping on best val accuracy.** We snapshot the best weights (not the final epoch's) and ship those — late-training overfit doesn't degrade what gets saved.
+* **Early stopping on best val accuracy.** Snapshot the best weights (not the final epoch's) and ship those — late-training overfit doesn't degrade what gets saved.
 * **Deterministic.** `SEED` seeds NumPy, PyTorch, and `train_test_split`.
 
 ### Inference app (`ds_app.py`)
