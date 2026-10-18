@@ -111,9 +111,10 @@ Then in the sidebar:
 The app displays:
 
 * A preview of the uploaded CSV.
-* A predictions table (`PassengerId`, `Predicted`, `P(Survived)`), with a CSV download button.
+* A predictions table (`PassengerId`, `Predicted`, `P(Survived)`, and — when `data/gender_submission.csv` is available — `Survived (gender_submission)`), with a CSV download button.
 * A probability-distribution histogram and a predicted-outcome bar chart.
 * Predicted survival rate broken down by `Sex`, `Pclass`, and age group.
+* A **confusion matrix** comparing predictions against `data/gender_submission.csv` when that file is present.
 
 A **Shutdown server** button in the sidebar stops the Streamlit process cleanly.
 
@@ -133,6 +134,10 @@ A **Shutdown server** button in the sidebar stops the Streamlit process cleanly.
 
 ![Streamlit insights](docs/screenshots/streamlit_insights.png)
 
+**Streamlit app — prediction insights (confusion matrix)**:
+
+![Streamlit insights](docs/screenshots/streamlit_insights2.png)
+
 End-to-end:
 
 ```bash
@@ -143,6 +148,31 @@ python train.py
 # Interactive inference
 streamlit run ds_app.py
 ```
+
+---
+
+## Results
+
+Running inference on `data/test.csv` (418 passengers) and comparing predictions against `data/gender_submission.csv` yields the following confusion matrix:
+
+|                            | Pred: Not Survived | Pred: Survived |
+|----------------------------|-------------------:|---------------:|
+| **Actual: Not Survived**   | 234 (TN)           | 32 (FP)        |
+| **Actual: Survived**       | 12 (FN)            | 140 (TP)       |
+
+Derived metrics (n = 418):
+
+| Metric      | Value  | Formula                       |
+|-------------|-------:|-------------------------------|
+| Accuracy    | 89.5%  | (TN + TP) / n = 374 / 418     |
+| Precision   | 81.4%  | TP / (TP + FP) = 140 / 172    |
+| Recall      | 92.1%  | TP / (TP + FN) = 140 / 152    |
+| Specificity | 88.0%  | TN / (TN + FP) = 234 / 266    |
+| F1-score    | 0.86   | 2·P·R / (P + R)               |
+
+The model slightly over-predicts "survived" (32 FPs vs. 12 FNs), with recall (92%) higher than precision (81%) — it rarely misses a real survivor but occasionally flags non-survivors.
+
+> **Note:** `gender_submission.csv` is Kaggle's "all females survived" baseline, not the real Titanic ground truth. These metrics measure agreement with that baseline, not true test-set accuracy. The authoritative accuracy comes from submitting predictions to Kaggle.
 
 ---
 

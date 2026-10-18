@@ -102,6 +102,30 @@ def plot_rate_by_feature(df, y_pred, feature):
     return fig
 
 
+def plot_confusion_matrix(y_true, y_pred):
+    y_true = np.asarray(y_true, dtype=int).ravel()
+    y_pred = np.asarray(y_pred, dtype=int).ravel()
+    matrix = np.zeros((2, 2), dtype=int)
+    for t, p in zip(y_true, y_pred):
+        matrix[t, p] += 1
+    labels = ["Did not survive", "Survived"]
+    fig, ax = plt.subplots(figsize=(4, 3))
+    sns.heatmap(
+        matrix,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=labels,
+        yticklabels=labels,
+        cbar=False,
+        ax=ax,
+    )
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual (gender_submission.csv)")
+    ax.set_title(f"Confusion matrix (n={matrix.sum()})")
+    return fig
+
+
 def plot_rate_by_age(df, y_pred):
     buckets = pd.cut(
         df["Age"],
@@ -149,6 +173,15 @@ predictions_df = pd.DataFrame({
     "Predicted": predicted_labels,
     "P(Survived)": predicted_probabilities.round(4),
 })
+
+reference_path = Path("./data/gender_submission.csv")
+if reference_path.exists() and "PassengerId" in inference_df.columns:
+    reference_df = pd.read_csv(reference_path)[["PassengerId", "Survived"]]
+    predictions_df["PassengerId"] = predictions_df["PassengerId"].astype(int)
+    reference_df["PassengerId"] = reference_df["PassengerId"].astype(int)
+    predictions_df = predictions_df.merge(reference_df, on="PassengerId", how="left")
+    predictions_df = predictions_df.rename(columns={"Survived": "Survived (gender_submission)"})
+
 st.dataframe(predictions_df, use_container_width=True, height=320)
 
 st.download_button(
@@ -174,3 +207,17 @@ with bottom_col2:
     st.pyplot(plot_rate_by_feature(inference_df, predicted_labels, "Pclass"))
 with bottom_col3:
     st.pyplot(plot_rate_by_age(inference_df, predicted_labels))
+
+# ------------------ Confusion matrix vs. gender_submission.csv ------------------
+if "Survived (gender_submission)" in predictions_df.columns:
+    labeled = predictions_df.dropna(subset=["Survived (gender_submission)"])
+    if not labeled.empty:
+        st.subheader("Confusion matrix: Predicted vs. gender_submission.csv")
+        accuracy = (labeled["Predicted"] == labeled["Survived (gender_submission)"]).mean()
+        st.caption(f"Accuracy on {len(labeled)} labeled passengers: {accuracy:.1%}")
+        st.pyplot(
+            plot_confusion_matrix(
+                labeled["Survived (gender_submission)"].values,
+                labeled["Predicted"].values,
+            )
+        )
